@@ -1,6 +1,12 @@
 (function () {
   var app = document.getElementById("app"), qi = document.getElementById("q"), Q = "";
   var DEF = { nome: "João", prazoNome: "Matrícula", prazoData: "", cf: 0, ct: 240, done: {} };
+  var DEMO = { selectedClasses: [], enrollmentProtocol: "", request: null };
+  var DEMO_CLASSES = [
+    { id: "sma0354", code: "SMA0354", name: "Cálculo I", schedule: "Seg e qua · 10:10–11:50", vacancies: 12 },
+    { id: "ssc0603", code: "SSC0603", name: "Introdução à Ciência da Computação", schedule: "Ter e qui · 14:20–16:00", vacancies: 8 },
+    { id: "sel0637", code: "SEL0637", name: "Circuitos Elétricos", schedule: "Qua · 16:20–18:00", vacancies: 5 }
+  ];
 
   /* ---------- armazenamento (seguro se o navegador bloquear) ---------- */
   function load() { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem("jw") || "{}")); } catch (e) { return Object.assign({}, DEF); } }
@@ -22,6 +28,87 @@
     var n = Math.round((d - hoje) / 864e5), s = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
     return s + (n > 0 ? " · faltam " + n + (n === 1 ? " dia" : " dias") : n === 0 ? " · é hoje!" : " · já passou");
   }
+  function demoProtocol(prefix) { return prefix + "-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + Math.floor(1000 + Math.random() * 9000); }
+  function demoNotice() {
+    return '<p class="note s demo-notice">Demonstração interativa: os dados são fictícios e ficam apenas nesta página. Nada é consultado ou enviado ao sistema da USP.</p>';
+  }
+  function demoDocumentText(kind) {
+    if (kind === "historico") {
+      return "JÚPITER WEB — HISTÓRICO ESCOLAR (DEMONSTRAÇÃO)\n\nNome: " + S.nome
+        + "\nCurso: Engenharia de Computação (dados fictícios)\nNúmero USP: 00000000 (exemplo)\n\n"
+        + "2026 · 1º semestre\nSMA0354 — Cálculo I — Aprovado (exemplo)\nSSC0603 — Introdução à Ciência da Computação — Aprovado (exemplo)\n\n"
+        + "Este arquivo é apenas uma simulação. Não tem validade acadêmica e não foi emitido pela USP.\n";
+    }
+    return "JÚPITER WEB — ATESTADO DE MATRÍCULA (DEMONSTRAÇÃO)\n\nNome: " + S.nome
+      + "\nCurso: Engenharia de Computação (dados fictícios)\nSituação: regularmente matriculado (exemplo)\nAno: 2026\n\n"
+      + "Este arquivo é apenas uma simulação. Não tem validade acadêmica e não foi emitido pela USP.\n";
+  }
+  function demoCalendarFile() {
+    return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//JupiterWeb//Demonstracao//PT\r\nCALSCALE:GREGORIAN\r\n"
+      + "BEGIN:VEVENT\r\nUID:matricula-demo@jupiterweb.local\r\nDTSTAMP:20261111T120000Z\r\nDTSTART;VALUE=DATE:20261201\r\nDTEND;VALUE=DATE:20261202\r\nSUMMARY:Período de matrícula (exemplo)\r\nDESCRIPTION:Evento fictício para demonstração; confira as datas oficiais da USP.\r\nEND:VEVENT\r\n"
+      + "BEGIN:VEVENT\r\nUID:retificacao-demo@jupiterweb.local\r\nDTSTAMP:20261111T120000Z\r\nDTSTART;VALUE=DATE:20261208\r\nDTEND;VALUE=DATE:20261209\r\nSUMMARY:Retificação de matrícula (exemplo)\r\nDESCRIPTION:Evento fictício para demonstração; confira as datas oficiais da USP.\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+  }
+  function downloadDemoFile(name, content, type) {
+    var status = document.getElementById("download-status");
+    try {
+      var file = new Blob([content], { type: type }), url = URL.createObjectURL(file), link = document.createElement("a");
+      link.href = url; link.download = name; document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      if (status) status.textContent = "Arquivo de demonstração gerado e baixado: " + name;
+    } catch (e) {
+      if (status) status.textContent = "Não foi possível gerar o arquivo neste navegador. Tente novamente ou use outro navegador.";
+    }
+  }
+
+  function vDocumentos() {
+    return '<div><div class="crumb"><a href="#inicio">Início</a> › Meu curso</div><h1>Documentos</h1><p class="sub">Veja uma prévia e gere arquivos de exemplo diretamente no navegador.</p></div>'
+      + demoNotice()
+      + '<section class="card"><h2>Seus documentos</h2><p class="sub">Os arquivos são textos de demonstração, não documentos oficiais.</p>'
+      + '<div class="demo-doc"><div><b>Histórico escolar</b><span>Disciplinas e situação acadêmica · exemplo</span></div><button class="btn o" type="button" data-download="historico">Baixar exemplo .txt</button></div>'
+      + '<div class="demo-doc"><div><b>Atestado de matrícula</b><span>Vínculo acadêmico · exemplo</span></div><button class="btn o" type="button" data-download="atestado">Baixar exemplo .txt</button></div>'
+      + '<p id="download-status" class="sub demo-status" role="status" aria-live="polite"></p></section>'
+      + '<section class="card"><h2>Prévia do histórico</h2><pre class="demo-preview">' + esc(demoDocumentText("historico")) + '</pre></section>'
+      + '<section class="card"><h2>Precisa de um documento oficial?</h2><p class="sub">A emissão real exige acesso ao sistema oficial da USP.</p><div class="links"><a href="' + JW + '" target="_blank" rel="noopener">Acessar o Júpiter Web oficial ↗</a></div></section>';
+  }
+
+  function vMatricula(searchOnly) {
+    var cards = DEMO_CLASSES.map(function (c) {
+      var selected = DEMO.selectedClasses.indexOf(c.id) > -1;
+      return '<article class="demo-class"><div><span class="tag">' + c.code + '</span><h3>' + c.name + '</h3><p class="sub">' + c.schedule + '</p><p class="sub">' + c.vacancies + ' vagas · número ilustrativo</p></div>'
+        + '<button class="btn ' + (selected ? 'o' : '') + '" type="button" data-toggle-class="' + c.id + '" aria-pressed="' + selected + '">' + (selected ? 'Remover' : 'Adicionar') + '</button></article>';
+    }).join("");
+    var confirmation = DEMO.enrollmentProtocol
+      ? '<div class="note s demo-result" role="status"><b>Simulação concluída.</b><br>Protocolo demonstrativo: ' + esc(DEMO.enrollmentProtocol) + '. Nenhuma matrícula foi enviada à USP.</div>'
+      : "";
+    return '<div><div class="crumb"><a href="#inicio">Início</a> › Meu semestre</div><h1>' + (searchOnly ? "Buscar turmas" : "Simular matrícula") + '</h1><p class="sub">Escolha algumas turmas e confirme para ver como seria o fluxo.</p></div>'
+      + demoNotice()
+      + '<section class="card"><h2>Turmas disponíveis (exemplo)</h2><p class="sub">Selecione ou remova disciplinas. Vagas e horários são fictícios.</p>' + cards
+      + '<div class="demo-actions"><span class="sub">' + DEMO.selectedClasses.length + ' turma(s) selecionada(s)</span><button class="btn" type="button" id="confirm-enrollment"' + (DEMO.selectedClasses.length ? "" : " disabled") + '>Confirmar simulação</button></div>'
+      + confirmation + '</section>'
+      + '<p class="sub">Para efetuar uma matrícula real, consulte os períodos e regras no <a class="inline-link" href="' + JW + '" target="_blank" rel="noopener">Júpiter Web oficial ↗</a>.</p>';
+  }
+
+  function vRequerimento() {
+    var result = DEMO.request
+      ? '<div class="note s demo-result" role="status"><b>Pedido de demonstração registrado nesta página.</b><br>Protocolo: ' + esc(DEMO.request.protocol) + '<br>Tipo: ' + esc(DEMO.request.type) + '<br>Motivo: ' + esc(DEMO.request.reason) + '<br><b>Nada foi enviado à USP.</b></div>'
+      : "";
+    return '<div><div class="crumb"><a href="#inicio">Início</a> › Meu semestre</div><h1>Simular requerimento</h1><p class="sub">Preencha um pedido de exemplo e veja a confirmação, sem enviar dados para lugar algum.</p></div>'
+      + demoNotice()
+      + '<section class="card"><form id="demo-request"><label class="demo-label" for="request-type">Tipo de pedido</label><select id="request-type" name="type" required><option value="">Selecione</option><option>Solicitação de vaga em disciplina</option><option>Conflito de horário</option><option>Outro pedido acadêmico</option></select>'
+      + '<label class="demo-label" for="request-reason">Explique o motivo</label><textarea id="request-reason" name="reason" maxlength="400" required placeholder="Exemplo: preciso cursar esta disciplina neste semestre."></textarea>'
+      + '<div class="demo-actions"><button class="btn" type="submit">Registrar simulação</button></div></form>' + result + '</section>'
+      + '<p class="sub">Um requerimento real deve ser feito pelo <a class="inline-link" href="' + JW + '" target="_blank" rel="noopener">Júpiter Web oficial ↗</a>.</p>';
+  }
+
+  function vCalendario() {
+    return '<div><div class="crumb"><a href="#inicio">Início</a> › Meu semestre</div><h1>Calendário escolar</h1><p class="sub">Confira como seria baixar eventos para seu calendário.</p></div>'
+      + demoNotice()
+      + '<section class="card"><h2>Agenda de exemplo</h2><div class="demo-doc"><div><b>Período de matrícula</b><span>Evento ilustrativo · data fictícia</span></div><span class="tag">Exemplo</span></div>'
+      + '<div class="demo-doc"><div><b>Retificação de matrícula</b><span>Evento ilustrativo · data fictícia</span></div><span class="tag">Exemplo</span></div>'
+      + '<button class="btn" type="button" data-download="agenda">Baixar agenda de exemplo (.ics)</button>'
+      + '<p id="download-status" class="sub demo-status" role="status" aria-live="polite"></p></section>'
+      + '<section class="card"><h2>Datas oficiais</h2><p class="sub">Consulte o calendário atualizado no site da Pró-Reitoria de Graduação.</p><div class="links"><a href="https://prg.usp.br/" target="_blank" rel="noopener">Abrir a Pró-Reitoria de Graduação ↗</a></div></section>';
+  }
 
   /* ---------- páginas ---------- */
   function vInicio() {
@@ -37,6 +124,7 @@
     return '<section class="hero"><div class="big"><p class="k">Seu painel do curso</p><h1 style="margin:10px 0 12px">O que você precisa fazer hoje?</h1><p class="d">Matrícula, grade, requerimentos e documentos num só lugar, com cada coisa explicada em uma linha.</p></div>'
       + '<div class="card stat"><span class="l">Próximo prazo</span><b>' + esc(S.prazoNome) + '</b><span class="sub" style="margin:0">' + fmtData(S.prazoData) + '</span><a class="go" href="#calendario">Ver calendário escolar →</a></div>'
       + '<div class="card stat"><span class="l">Evolução no curso</span><b>' + S.cf + ' de ' + S.ct + ' créditos</b><div class="bar" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%"></i></div><a class="go" href="#acompanhamentos">Ver o que falta →</a></div></section>'
+      + '<section class="card demo-launch"><div><h2>Experimente as simulações</h2><p class="sub">Teste ações comuns sem login: escolha disciplinas, registre um requerimento ou gere arquivos fictícios.</p></div><div class="row"><a class="btn" href="#matricula">Simular matrícula</a><a class="btn o" href="#requerimento">Criar requerimento</a><a class="btn o" href="#documentos">Baixar documentos</a></div></section>'
       + '<section><h2>Acesso rápido</h2><p class="sub">As tarefas mais comuns, com o que cada uma significa.</p><div class="grid g3" style="margin-top:20px">' + q + '</div></section>'
       + '<section class="card" style="padding:30px"><h2>Apoio da USP para você</h2><p class="sub">Ninguém entra sabendo. Pedir ajuda faz parte, e os veteranos já passaram por isso.</p><div class="row" style="margin-top:20px">' + ap + '</div></section>'
       + '<section class="card"><h2>Checklist do calouro <span class="tag">' + feitos + '/' + CALOURO.length + '</span></h2><p class="sub">Marque o que já fez. Fica salvo neste navegador.</p><div style="margin-top:14px">' + lista + '</div></section>'
@@ -105,9 +193,12 @@
   function render(top) {
     var r = location.hash.slice(1) || "inicio", h;
     if (Q) h = vBusca(); else if (r === "inicio") h = vInicio(); else if (r === "mapa") h = vMapa();
-    else if (r === "grade") h = vGrade(); else if (r === "apoio") h = vApoio(); else if (IT[r]) h = vItem(r); else h = vInicio();
+    else if (r === "grade") h = vGrade(); else if (r === "apoio") h = vApoio();
+    else if (r === "matricula") h = vMatricula(false); else if (r === "disciplina") h = vMatricula(true);
+    else if (r === "requerimento") h = vRequerimento(); else if (r === "documentos" || r === "historico") h = vDocumentos();
+    else if (r === "calendario") h = vCalendario(); else if (IT[r]) h = vItem(r); else h = vInicio();
     app.innerHTML = h; nav();
-    document.title = "Júpiter Web – " + (IT[r] ? IT[r][0] : "proposta de redesenho");
+    document.title = "Júpiter Web – " + (r === "matricula" ? "Simular matrícula" : r === "disciplina" ? "Buscar turmas" : r === "requerimento" ? "Simular requerimento" : r === "documentos" || r === "historico" ? "Documentos" : r === "calendario" ? "Calendário escolar" : IT[r] ? IT[r][0] : "proposta de redesenho");
     if (top) window.scrollTo(0, 0);
   }
 
@@ -123,6 +214,30 @@
   });
   app.addEventListener("click", function (e) {
     if (e.target.id === "sgb") { var b = document.getElementById("sg"); b.hidden = !b.hidden; }
+    var fileButton = e.target.closest("[data-download]");
+    if (fileButton) {
+      var fileKind = fileButton.dataset.download;
+      if (fileKind === "agenda") downloadDemoFile("agenda-exemplo.ics", demoCalendarFile(), "text/calendar;charset=utf-8");
+      else downloadDemoFile(fileKind + "-demonstracao.txt", demoDocumentText(fileKind), "text/plain;charset=utf-8");
+    }
+    var classButton = e.target.closest("[data-toggle-class]");
+    if (classButton) {
+      var classId = classButton.dataset.toggleClass, index = DEMO.selectedClasses.indexOf(classId);
+      if (index > -1) DEMO.selectedClasses.splice(index, 1); else DEMO.selectedClasses.push(classId);
+      DEMO.enrollmentProtocol = "";
+      render(false);
+    }
+    if (e.target.id === "confirm-enrollment" && DEMO.selectedClasses.length) {
+      DEMO.enrollmentProtocol = demoProtocol("DEMO-MAT");
+      render(false);
+    }
+  });
+  app.addEventListener("submit", function (e) {
+    if (e.target.id !== "demo-request") return;
+    e.preventDefault();
+    var fields = e.target.elements;
+    DEMO.request = { protocol: demoProtocol("DEMO-REQ"), type: fields.namedItem("type").value, reason: fields.namedItem("reason").value.trim() };
+    render(false);
   });
 
   /* tema */
