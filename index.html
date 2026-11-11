@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Proposta de redesenho do Júpiter Web (USP): matrícula, grade, requerimentos e documentos explicados em linguagem simples.">
+<title>Júpiter Web – proposta de redesenho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip" href="#app">Pular para o conteúdo</a>
+<header>
+  <div class="wrap top">
+    <a class="logo" href="#inicio">Júpiter<small>web</small></a>
+    <form class="search" role="search" onsubmit="return false">
+      <label for="q" class="sr">Buscar no Júpiter</label>
+      <input id="q" type="search" placeholder="Buscar: matrícula, requerimento, histórico…  ( / )" autocomplete="off">
+    </form>
+    <nav class="dk" aria-label="Principal" id="dk"></nav>
+    <button class="icon-btn" id="theme" type="button" aria-label="Alternar tema claro/escuro" title="Tema"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg></button>
+    <button class="me" id="me" type="button" title="Personalizar">Olá, <b id="nome">João</b></button>
+  </div>
+</header>
+<div class="wrap"><main id="app" tabindex="-1"></main></div>
+<footer class="wrap foot">
+  <p>Proposta de redesenho feita por estudante. <b>Não é o sistema oficial</b> nem tem vínculo com a USP. Para acessar de verdade, use o
+  <a href="https://uspdigital.usp.br/jupiterweb/" target="_blank" rel="noopener">Júpiter Web oficial</a>.</p>
+</footer>
+<nav class="mb" aria-label="Principal" id="mb"></nav>
+
+<dialog id="dlg">
+  <form method="dialog" id="perfil">
+    <h2>Personalizar o painel</h2>
+    <p class="sub">Salvo só neste navegador. Nada é enviado a lugar nenhum.</p>
+    <label>Seu nome<input name="nome" maxlength="30"></label>
+    <label>Próximo prazo (nome)<input name="prazoNome" maxlength="40"></label>
+    <label>Data do prazo<input name="prazoData" type="date"></label>
+    <label>Créditos feitos<input name="cf" type="number" min="0" max="999"></label>
+    <label>Créditos do curso<input name="ct" type="number" min="1" max="999"></label>
+    <div class="row"><button class="btn o" value="cancel">Cancelar</button><button class="btn" value="ok">Salvar</button></div>
+  </form>
+</dialog>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
